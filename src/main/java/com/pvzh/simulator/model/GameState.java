@@ -1,6 +1,7 @@
 package com.pvzh.simulator.model;
 
 import com.pvzh.simulator.engine.PhaseManager;
+import com.pvzh.simulator.modifier.ModifierPipeline;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,10 +16,8 @@ public class GameState {
     private final List<Lane> lanes;
     private final PhaseManager phaseManager;
 
-    // Note for Information Hiding ("Lie by Omission"):
-    // When serializing this GameState to JSON for the client, you MUST NOT
-    // serialize the opponent's hand or deck order.
-    // E.g., The Plant player's view should only contain `plantPlayer.getHand()` and the size of `zombiePlayer.getHand()`.
+    // Global modifiers affecting all entities or specific rules
+    private final ModifierPipeline globalModifierPipeline = new ModifierPipeline();
 
     public GameState(Player plantPlayer, Player zombiePlayer) {
         this.plantPlayer = plantPlayer;
@@ -34,26 +33,16 @@ public class GameState {
         lanes.add(new Lane(5, LaneType.WATER));
     }
 
-    public Player getPlantPlayer() {
-        return plantPlayer;
-    }
-
-    public Player getZombiePlayer() {
-        return zombiePlayer;
-    }
-
-    public List<Lane> getLanes() {
-        return lanes;
-    }
+    public Player getPlantPlayer() { return plantPlayer; }
+    public Player getZombiePlayer() { return zombiePlayer; }
+    public List<Lane> getLanes() { return lanes; }
+    public PhaseManager getPhaseManager() { return phaseManager; }
+    public ModifierPipeline getGlobalModifierPipeline() { return globalModifierPipeline; }
 
     public Lane getLane(int laneId) {
         if (laneId >= 1 && laneId <= 5) {
             return lanes.get(laneId - 1);
         }
         return null;
-    }
-
-    public PhaseManager getPhaseManager() {
-        return phaseManager;
     }
 }

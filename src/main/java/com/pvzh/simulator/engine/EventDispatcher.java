@@ -32,14 +32,9 @@ public class EventDispatcher {
         return eventManager;
     }
 
-    /**
-     * Sweeps the board from Lane 1 to Lane 5.
-     * Within each lane, applies the action to all Zombie fighters first, then all Plant fighters.
-     */
     public void sweepBoard(Consumer<Card> zombieAction, Consumer<Card> plantAction) {
         for (Lane lane : gameState.getLanes()) {
             if (zombieAction != null) {
-                // To avoid concurrent modification, iterate over a copy
                 for (Card zombie : new ArrayList<>(lane.getZombieFighters())) {
                     zombieAction.accept(zombie);
                 }
@@ -52,12 +47,7 @@ public class EventDispatcher {
         }
     }
 
-    /**
-     * Sweeps both hands, then sweeps the board Left-to-Right, Zombie-First.
-     * Required for "End of Turn" transformation mechanics (e.g., Reincarnation).
-     */
     public void sweepBoardAndHands(Consumer<Card> zombieAction, Consumer<Card> plantAction) {
-        // Sweep Hands first (order usually doesn't matter for hands, but we can do Zombie Hand then Plant Hand)
         if (zombieAction != null) {
             for (Card zombieHandCard : new ArrayList<>(gameState.getZombiePlayer().getHand())) {
                 zombieAction.accept(zombieHandCard);
@@ -68,14 +58,9 @@ public class EventDispatcher {
                 plantAction.accept(plantHandCard);
             }
         }
-
-        // Sweep Board
         sweepBoard(zombieAction, plantAction);
     }
 
-    /**
-     * Unveils all gravestones on the board. Usually called during the transition to ZOMBIE_TRICKS.
-     */
     public void unveilGravestones() {
         sweepBoard(
             zombie -> {
@@ -84,13 +69,10 @@ public class EventDispatcher {
                     eventManager.publish(new UnveilEvent(zombie));
                 }
             },
-            null // Plants do not typically have gravestones, but we could make it universal if a mod requires it
+            null
         );
     }
 
-    /**
-     * Resolves pending destructions across the entire board.
-     */
     public void resolveDestructions() {
         sweepBoard(
             zombie -> {
@@ -116,16 +98,16 @@ public class EventDispatcher {
         for (Lane lane : gameState.getLanes()) {
             lane.removeFighter(card);
         }
-    }
+        // CRITICAL AURA LIFECYCLE: Remove any global board auras tied to this specific card instance.
+        gameState.getGlobalModifierPipeline().removeModifiersBySource(card.getInstanceId());
 
-    // Phase Transition Hooks
+        // Also remove any modifiers it injected into the Player directly (e.g. Brainy/Suns modifiers)
+        // This is handled by ensuring they share the same pipeline or calling remove on the player's pipeline.
+    }
 
     public void triggerPhaseStart(Phase phase, int turnNumber) {
         if (phase == Phase.ZOMBIE_PLAY) {
-            // Global event for external listeners
             eventManager.publish(new TurnStartEvent(turnNumber));
-
-            // Sequential left-to-right + hand sweep for cards responding to turn start
             sweepBoardAndHands(
                 zombie -> eventManager.publish(new EntityTurnStartEvent(zombie, turnNumber)),
                 plant -> eventManager.publish(new EntityTurnStartEvent(plant, turnNumber))
@@ -135,13 +117,10 @@ public class EventDispatcher {
 
     public void triggerPhaseEnd(Phase phase, int turnNumber) {
         if (phase == Phase.FIGHT) {
-            // Sequential left-to-right + hand sweep for cards responding to turn end (e.g. Reincarnation)
             sweepBoardAndHands(
                 zombie -> eventManager.publish(new EntityTurnEndEvent(zombie, turnNumber)),
                 plant -> eventManager.publish(new EntityTurnEndEvent(plant, turnNumber))
             );
-
-            // Global event for external listeners
             eventManager.publish(new TurnEndEvent(turnNumber));
         }
     }
