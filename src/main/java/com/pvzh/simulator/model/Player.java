@@ -27,45 +27,16 @@ public class Player {
         this.currentResources = 0;
     }
 
-    public Side getSide() {
-        return side;
-    }
-
-    public Hero getHero() {
-        return hero;
-    }
-
-    public void setDeck(Deck deck) {
-        this.deck = deck;
-    }
-
-    public Deck getDeck() {
-        return deck;
-    }
-
-    public int getMaxResources() {
-        return maxResources;
-    }
-
-    public void setMaxResources(int maxResources) {
-        this.maxResources = maxResources;
-    }
-
-    public int getCurrentResources() {
-        return currentResources;
-    }
-
-    public void setCurrentResources(int currentResources) {
-        this.currentResources = currentResources;
-    }
-
-    public void spendResources(int amount) {
-        this.currentResources -= amount;
-    }
-
-    public List<Card> getHand() {
-        return hand;
-    }
+    public Side getSide() { return side; }
+    public Hero getHero() { return hero; }
+    public void setDeck(Deck deck) { this.deck = deck; }
+    public Deck getDeck() { return deck; }
+    public int getMaxResources() { return maxResources; }
+    public void setMaxResources(int maxResources) { this.maxResources = maxResources; }
+    public int getCurrentResources() { return currentResources; }
+    public void setCurrentResources(int currentResources) { this.currentResources = currentResources; }
+    public void spendResources(int amount) { this.currentResources -= amount; }
+    public List<Card> getHand() { return hand; }
 
     public boolean addCardToHand(Card card, CardSource source) {
         if (source == CardSource.BOUNCE) {
@@ -81,31 +52,25 @@ public class Player {
         }
     }
 
-    /**
-     * Attempts to draw a card from the deck.
-     * Fires a GameOverEvent if the deck is empty.
-     */
     public void drawCard(EventManager eventManager) {
         if (deck == null) return;
-
         CardDefinition def = deck.draw();
         if (def == null) {
             eventManager.publish(new GameOverEvent(this, "Deckout"));
             return;
         }
-
         Card card = new Card(def, this);
         addCardToHand(card, CardSource.DRAW);
     }
 
-    /**
-     * Helper method to process damage directed at the Player.
-     * Passes the attacker to handle Bullseye and triggers block rewards.
-     */
     public void takeDamage(int amount, Card attacker) {
         hero.takeDamage(amount, attacker, powerRewardDefinition -> {
             Card powerCard = new Card(powerRewardDefinition, this);
             addCardToHand(powerCard, CardSource.BLOCK_REWARD);
         });
+    }
+
+    public void heal(int amount) {
+        hero.heal(amount);
     }
 }
