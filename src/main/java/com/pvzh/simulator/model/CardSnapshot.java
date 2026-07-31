@@ -1,19 +1,19 @@
 package com.pvzh.simulator.model;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * A perfectly frozen snapshot of a Card's state at a specific millisecond.
  * Crucial for simultaneous combat resolution logic.
+ * OPTIMIZATION: Uses a primitive array mapping Trait ordinals instead of a HashMap to minimize Garbage Collection overhead.
  */
-public class CardSnapshot {
+public final class CardSnapshot {
     private final Card cardRef;
     private final Side side;
     private final int currentHealth;
     private final int attack;
     private final int cost;
-    private final Map<Trait, Integer> traits = new HashMap<>();
+
+    // Array size equal to number of enum constants in Trait. Highly performant.
+    private final int[] traitValues = new int[Trait.values().length];
 
     public CardSnapshot(Card card) {
         this.cardRef = card;
@@ -22,11 +22,11 @@ public class CardSnapshot {
         this.attack = card.getAttack();
         this.cost = card.getCost();
 
-        // Capture all active traits dynamically
+        // Capture all active traits dynamically with zero boxing overhead
         for (Trait trait : Trait.values()) {
             int val = card.getTraitValue(trait);
             if (val > 0) {
-                this.traits.put(trait, val);
+                this.traitValues[trait.ordinal()] = val;
             }
         }
     }
@@ -38,10 +38,10 @@ public class CardSnapshot {
     public int getCost() { return cost; }
 
     public int getTraitValue(Trait trait) {
-        return traits.getOrDefault(trait, 0);
+        return traitValues[trait.ordinal()];
     }
 
     public boolean hasTrait(Trait trait) {
-        return getTraitValue(trait) > 0;
+        return traitValues[trait.ordinal()] > 0;
     }
 }

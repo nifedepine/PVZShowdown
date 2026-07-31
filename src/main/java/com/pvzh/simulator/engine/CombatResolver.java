@@ -14,13 +14,13 @@ import java.util.List;
 /**
  * Handles the generalized combat loop, simultaneous strike snapshotting, and bonus attacks.
  */
-public class CombatManager {
+public class CombatResolver {
     private final GameState gameState;
     private final EventManager eventManager;
     private final EventDispatcher eventDispatcher;
     private final GameLogger logger;
 
-    public CombatManager(GameState gameState, EventManager eventManager, EventDispatcher eventDispatcher, GameLogger logger) {
+    public CombatResolver(GameState gameState, EventManager eventManager, EventDispatcher eventDispatcher, GameLogger logger) {
         this.gameState = gameState;
         this.eventManager = eventManager;
         this.eventDispatcher = eventDispatcher;

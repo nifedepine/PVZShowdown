@@ -11,7 +11,6 @@ import com.pvzh.simulator.model.GameState;
 import com.pvzh.simulator.model.Lane;
 import com.pvzh.simulator.model.Phase;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -32,15 +31,22 @@ public class EventDispatcher {
         return eventManager;
     }
 
+    /**
+     * Optimized board sweep using zero-allocation arrays from the lists, preventing ConcurrentModificationExceptions
+     * without creating full ArrayList copies.
+     */
     public void sweepBoard(Consumer<Card> zombieAction, Consumer<Card> plantAction) {
         for (Lane lane : gameState.getLanes()) {
             if (zombieAction != null) {
-                for (Card zombie : new ArrayList<>(lane.getZombieFighters())) {
+                // Optimization: toArray avoids full ArrayList instantiation while still preventing CME.
+                Card[] zombies = lane.getZombieFighters().toArray(new Card[0]);
+                for (Card zombie : zombies) {
                     zombieAction.accept(zombie);
                 }
             }
             if (plantAction != null) {
-                for (Card plant : new ArrayList<>(lane.getPlantFighters())) {
+                Card[] plants = lane.getPlantFighters().toArray(new Card[0]);
+                for (Card plant : plants) {
                     plantAction.accept(plant);
                 }
             }
@@ -49,12 +55,14 @@ public class EventDispatcher {
 
     public void sweepBoardAndHands(Consumer<Card> zombieAction, Consumer<Card> plantAction) {
         if (zombieAction != null) {
-            for (Card zombieHandCard : new ArrayList<>(gameState.getZombiePlayer().getHand())) {
+            Card[] zombieHand = gameState.getZombiePlayer().getHand().toArray(new Card[0]);
+            for (Card zombieHandCard : zombieHand) {
                 zombieAction.accept(zombieHandCard);
             }
         }
         if (plantAction != null) {
-            for (Card plantHandCard : new ArrayList<>(gameState.getPlantPlayer().getHand())) {
+            Card[] plantHand = gameState.getPlantPlayer().getHand().toArray(new Card[0]);
+            for (Card plantHandCard : plantHand) {
                 plantAction.accept(plantHandCard);
             }
         }
@@ -94,16 +102,19 @@ public class EventDispatcher {
         // Here we would look up abilities triggered on destruction.
     }
 
-    private void removeFighterFromBoard(Card card) {
+    public void removeFighterFromBoard(Card card) {
         for (Lane lane : gameState.getLanes()) {
             lane.removeFighter(card);
         }
+        // LEAK PREVENTION: Remove global board auras tied to this specific card instance.
         gameState.getGlobalModifierPipeline().removeModifiersBySource(card.getInstanceId());
+
+        // LEAK PREVENTION: Unsubscribe any reactive abilities attached to this entity
+        eventManager.unsubscribeAll(card.getInstanceId());
     }
 
     public void triggerPhaseStart(Phase phase, int turnNumber) {
         if (phase == Phase.ZOMBIE_PLAY) {
-            // Ramp economy for both players at the start of the turn
             gameState.getZombiePlayer().startTurnRamp();
             gameState.getPlantPlayer().startTurnRamp();
 

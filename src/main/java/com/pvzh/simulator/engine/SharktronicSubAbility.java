@@ -21,27 +21,26 @@ public class SharktronicSubAbility {
      * Should be called when the card enters the board.
      */
     public void onEnterBoard() {
-        eventManager.subscribe(DamageTakenEvent.class, this::onDamageTaken);
+        eventManager.subscribe(self.getInstanceId(), DamageTakenEvent.class, this::onDamageTaken);
     }
 
     /**
-     * Should be called when the card leaves the board (destroyed, bounced).
+     * Note: With the new EventManager.unsubscribeAll(subscriberId),
+     * this explicit unsubscription is technically optional if handled globally on destruction,
+     * but remains good practice.
      */
     public void onLeaveBoard() {
         eventManager.unsubscribe(DamageTakenEvent.class, this::onDamageTaken);
     }
 
     private void onDamageTaken(DamageTakenEvent event) {
-        // If this Sharktronic Sub is marked for destruction, it shouldn't trigger
         if (self.isMarkedForDestruction()) {
             return;
         }
 
         Card victim = event.getVictim();
         if (victim != null && victim.getOwner().getSide() == Side.PLANT) {
-            // "Destroy that Plant"
             victim.markForDestruction();
-            // In the actual engine, we might log this or trigger an animation event
         }
     }
 }

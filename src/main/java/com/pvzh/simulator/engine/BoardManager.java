@@ -18,10 +18,12 @@ import java.util.UUID;
 public class BoardManager {
     private final GameState gameState;
     private final CardRegistry registry;
+    private final EventManager eventManager;
 
-    public BoardManager(GameState gameState, CardRegistry registry) {
+    public BoardManager(GameState gameState, CardRegistry registry, EventManager eventManager) {
         this.gameState = gameState;
         this.registry = registry;
+        this.eventManager = eventManager;
     }
 
     /**
@@ -48,9 +50,14 @@ public class BoardManager {
         }
     }
 
+    /**
+     * Silently replaces a card in its exact current location (Hand or Lane).
+     * Cleans up all old subscriptions to prevent memory leaks and retains persistent traits.
+     */
     public Card transformCard(Card oldCard, CardDefinition newDef) {
         Card newCard = new Card(newDef, oldCard.getOwner());
 
+        // Handle persistent transformation traits (e.g., Reincarnation, Fig)
         if (oldCard.hasTrait(Trait.REINCARNATION)) {
             String modId = UUID.randomUUID().toString();
             newCard.getAttackPipeline().addModifier(new SimpleModifier(modId, 50, 1, null, 0));
@@ -60,6 +67,10 @@ public class BoardManager {
             String modId = UUID.randomUUID().toString();
             newCard.getTraitPipeline().addModifier(new SimpleModifier(modId, 50, 0, Trait.FIG_LEAP, 1));
         }
+
+        // LEAK PREVENTION: Remove global auras and unsubscribe old card
+        gameState.getGlobalModifierPipeline().removeModifiersBySource(oldCard.getInstanceId());
+        eventManager.unsubscribeAll(oldCard.getInstanceId());
 
         boolean swappedInHand = swapInHand(oldCard, newCard);
         if (!swappedInHand) {
