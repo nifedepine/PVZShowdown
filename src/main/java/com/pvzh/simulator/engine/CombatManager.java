@@ -10,7 +10,6 @@ import com.pvzh.simulator.model.Trait;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Handles the generalized combat loop, simultaneous strike snapshotting, and bonus attacks.
@@ -30,53 +29,72 @@ public class CombatManager {
 
     /**
      * Executes the standard Fight Phase for a specific lane.
+     * Fully supports Team-Up by looping over all fighters in the lane.
      */
     public void resolveLaneCombat(Lane lane) {
         logger.logDebug("Resolving combat for Lane " + lane.getId());
 
-        List<Card> zombies = lane.getZombieFighters();
-        List<Card> plants = lane.getPlantFighters();
-
-        Card zombie = zombies.isEmpty() ? null : zombies.get(0);
-        Card plant = plants.isEmpty() ? null : plants.get(0);
-
-        if (zombie == null && plant == null) {
-            return;
-        }
-
-        // Snapshot Generation
-        CardSnapshot zombieSnap = zombie != null ? new CardSnapshot(zombie) : null;
-        CardSnapshot plantSnap = plant != null ? new CardSnapshot(plant) : null;
-
-        // Queued bonus attacks so they don't break simultaneous resolution rules
-        List<Card> queuedBonusAttacks = new ArrayList<>();
-
-        // Zombie Strike
-        if (zombieSnap != null) {
-            executeStrike(zombieSnap, plantSnap, lane.getId(), false, queuedBonusAttacks);
-        }
-
-        // Plant Strike
-        if (plantSnap != null) {
-            executeStrike(plantSnap, zombieSnap, lane.getId(), false, queuedBonusAttacks);
-        }
-
-        // End of Lane Combat: Resolve destructions
+        // Step 1: Pre-Combat Environments
+        resolvePreCombatEnvironments(lane);
         eventDispatcher.resolveDestructions();
 
-        // Perform queued bonus attacks after normal combat is over
-        for (Card attacker : queuedBonusAttacks) {
-            performBonusAttack(attacker);
+        List<Card> zombies = new ArrayList<>(lane.getZombieFighters());
+        List<Card> plants = new ArrayList<>(lane.getPlantFighters());
+
+        // Step 2: Pre-Combat Overshoot (Zombies First)
+        for (Card zombie : zombies) {
+            if (zombie.hasTrait(Trait.OVERSHOOT) && !zombie.isMarkedForDestruction()) {
+                int overshootDmg = zombie.getTraitValue(Trait.OVERSHOOT);
+                gameState.getPlantPlayer().takeDamage(overshootDmg, zombie);
+            }
+        }
+
+        // Step 3: Pre-Combat Overshoot (Plants)
+        for (Card plant : plants) {
+            if (plant.hasTrait(Trait.OVERSHOOT) && !plant.isMarkedForDestruction()) {
+                int overshootDmg = plant.getTraitValue(Trait.OVERSHOOT);
+                gameState.getZombiePlayer().takeDamage(overshootDmg, plant);
+            }
+        }
+
+        // We execute combat sequentially front-to-back if there are multiple team-up cards.
+        // For PvP simulator purposes, we match Zombie[0] vs Plant[0], and Zombie[1] vs Plant[1], etc.
+        int maxFights = Math.max(zombies.size(), plants.size());
+
+        for (int i = 0; i < maxFights; i++) {
+            Card zombie = i < zombies.size() ? zombies.get(i) : null;
+            Card plant = i < plants.size() ? plants.get(i) : null;
+
+            // Step 4: Snapshot Generation (Only for survivors)
+            CardSnapshot zombieSnap = (zombie != null && !zombie.isMarkedForDestruction()) ? new CardSnapshot(zombie) : null;
+            CardSnapshot plantSnap = (plant != null && !plant.isMarkedForDestruction()) ? new CardSnapshot(plant) : null;
+
+            List<Card> queuedBonusAttacks = new ArrayList<>();
+
+            // Step 5: Simultaneous Combat Strikes
+            if (zombieSnap != null) {
+                executeStrike(zombieSnap, plantSnap, lane.getId(), false, queuedBonusAttacks);
+            }
+            if (plantSnap != null) {
+                executeStrike(plantSnap, zombieSnap, lane.getId(), false, queuedBonusAttacks);
+            }
+
+            // Step 6: Lane Cleanup (Resolve Destructions per pairing before moving to backline)
+            eventDispatcher.resolveDestructions();
+
+            for (Card attacker : queuedBonusAttacks) {
+                performBonusAttack(attacker);
+            }
         }
     }
 
-    /**
-     * Triggers a bonus attack for a specific card, checking for ANTI_BONUS_ATTACK auras.
-     */
+    private void resolvePreCombatEnvironments(Lane lane) {
+        // Placeholder for environment logic
+    }
+
     public void performBonusAttack(Card attacker) {
         if (attacker.isMarkedForDestruction()) return;
 
-        // Check Anti-Bonus Attack on the opposing side
         Side opponentSide = attacker.getOwner().getSide() == Side.PLANT ? Side.ZOMBIE : Side.PLANT;
         if (hasAntiBonusAttackAura(opponentSide)) {
             logger.logDebug("Bonus attack by " + attacker.getDefinition().getName() + " was blocked by Anti-Bonus Attack.");
@@ -97,13 +115,10 @@ public class CombatManager {
 
         List<Card> nestedBonusAttacks = new ArrayList<>();
 
-        // Execute strike, passing isBonusAttack = true to prevent infinite double strike loops
         executeStrike(attackerSnap, defenderSnap, attackerLane.getId(), true, nestedBonusAttacks);
 
-        // Immediate destruction resolution for Bonus Attack (as per mechanics, bonus attacks resolve fully in sequence)
         eventDispatcher.resolveDestructions();
 
-        // Note: nested bonus attacks can occur from Frenzy triggering during a bonus attack.
         for (Card nestedAttacker : nestedBonusAttacks) {
             performBonusAttack(nestedAttacker);
         }
@@ -115,7 +130,7 @@ public class CombatManager {
         if (attackerRef.isFrozen()) {
             attackerRef.setFrozen(false);
             logger.logDebug(attackerSnap.getCardRef().getDefinition().getName() + " is frozen and cannot attack!");
-            return; // Attack cancelled, but unfreezes
+            return;
         }
 
         int attackDamage = attackerSnap.hasTrait(Trait.ATTACK_WITH_HEALTH) ? attackerSnap.getCurrentHealth() : attackerSnap.getAttack();

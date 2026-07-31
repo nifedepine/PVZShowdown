@@ -98,15 +98,15 @@ public class EventDispatcher {
         for (Lane lane : gameState.getLanes()) {
             lane.removeFighter(card);
         }
-        // CRITICAL AURA LIFECYCLE: Remove any global board auras tied to this specific card instance.
         gameState.getGlobalModifierPipeline().removeModifiersBySource(card.getInstanceId());
-
-        // Also remove any modifiers it injected into the Player directly (e.g. Brainy/Suns modifiers)
-        // This is handled by ensuring they share the same pipeline or calling remove on the player's pipeline.
     }
 
     public void triggerPhaseStart(Phase phase, int turnNumber) {
         if (phase == Phase.ZOMBIE_PLAY) {
+            // Ramp economy for both players at the start of the turn
+            gameState.getZombiePlayer().startTurnRamp();
+            gameState.getPlantPlayer().startTurnRamp();
+
             eventManager.publish(new TurnStartEvent(turnNumber));
             sweepBoardAndHands(
                 zombie -> eventManager.publish(new EntityTurnStartEvent(zombie, turnNumber)),

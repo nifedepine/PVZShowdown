@@ -5,6 +5,7 @@ import com.pvzh.simulator.model.CardDefinition;
 import com.pvzh.simulator.model.CardType;
 import com.pvzh.simulator.model.GameState;
 import com.pvzh.simulator.model.Lane;
+import com.pvzh.simulator.model.Side;
 import com.pvzh.simulator.model.Trait;
 import com.pvzh.simulator.modifier.SimpleModifier;
 
@@ -27,7 +28,6 @@ public class BoardManager {
      * Moves a fighter from its current lane to a target lane.
      */
     public void moveFighter(Card card, int targetLaneId) {
-        // Find current lane
         Lane currentLane = null;
         for (Lane lane : gameState.getLanes()) {
             if (lane.getPlantFighters().contains(card) || lane.getZombieFighters().contains(card)) {
@@ -37,26 +37,21 @@ public class BoardManager {
         }
 
         if (currentLane == null) {
-            return; // Not on board
+            return;
         }
 
         Lane targetLane = gameState.getLane(targetLaneId);
+        // During movement, if it's just a move, we assume no overlap sacrifice is occurring.
         if (targetLane != null && targetLane.canPlayFighter(card)) {
             currentLane.removeFighter(card);
-            targetLane.addFighter(card);
+            targetLane.addFighter(card, null);
         }
     }
 
-    /**
-     * Silently replaces a card in its exact current location (Hand or Lane) without triggering destruction.
-     * Inherits persistent traits if applicable.
-     */
     public Card transformCard(Card oldCard, CardDefinition newDef) {
         Card newCard = new Card(newDef, oldCard.getOwner());
 
-        // Handle persistent transformation traits (e.g., Reincarnation, Fig)
         if (oldCard.hasTrait(Trait.REINCARNATION)) {
-            // Reincarnation grants +1/+1 and persists the REINCARNATION trait
             String modId = UUID.randomUUID().toString();
             newCard.getAttackPipeline().addModifier(new SimpleModifier(modId, 50, 1, null, 0));
             newCard.getHealthPipeline().addModifier(new SimpleModifier(modId, 50, 1, null, 0));
@@ -66,7 +61,6 @@ public class BoardManager {
             newCard.getTraitPipeline().addModifier(new SimpleModifier(modId, 50, 0, Trait.FIG_LEAP, 1));
         }
 
-        // Silent Swap
         boolean swappedInHand = swapInHand(oldCard, newCard);
         if (!swappedInHand) {
             swapInLane(oldCard, newCard);
@@ -75,10 +69,6 @@ public class BoardManager {
         return newCard;
     }
 
-    /**
-     * Applies the 'Leap' mechanic: transforms into a random card costing 1 more.
-     * Uses dynamic getCost() so modifications (e.g. Medulla Nebula) don't break the target.
-     */
     public void leap(Card card) {
         int targetCost = card.getCost() + 1;
         CardDefinition newDef = registry.getRandomCardWithCost(card.getDefinition().getSide(), CardType.FIGHTER, targetCost);
@@ -100,13 +90,15 @@ public class BoardManager {
 
     private void swapInLane(Card oldCard, Card newCard) {
         for (Lane lane : gameState.getLanes()) {
-            List<Card> fighters = newCard.getOwner().getSide() == com.pvzh.simulator.model.Side.PLANT
+            List<Card> fighters = newCard.getOwner().getSide() == Side.PLANT
                     ? lane.getPlantFighters()
                     : lane.getZombieFighters();
 
             int index = fighters.indexOf(oldCard);
             if (index != -1) {
                 fighters.set(index, newCard);
+                // Also wire newCard to gameState
+                newCard.setGameStateContext(gameState);
                 return;
             }
         }
