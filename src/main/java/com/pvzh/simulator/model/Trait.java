@@ -28,5 +28,9 @@ public enum Trait {
 
     // Transformation markers
     REINCARNATION,
-    FIG_LEAP
+    FIG_LEAP,
+
+    // Advanced Placement
+    EVOLUTION,
+    FUSION
 }

@@ -1,5 +1,6 @@
 package com.pvzh.simulator.model;
 
+import com.pvzh.simulator.modifier.AntiHeroModifier;
 import com.pvzh.simulator.modifier.ModifierPipeline;
 
 import java.util.UUID;
@@ -9,25 +10,18 @@ import java.util.UUID;
  * Computes its attributes dynamically via Modifier Pipelines.
  */
 public class Card {
-    private final String instanceId; // Unique ID for this instance
-    private final CardDefinition definition; // Static blueprint
+    private final String instanceId;
+    private final CardDefinition definition;
     private final Player owner;
 
-    // State management
     private CardState state = CardState.REVEALED;
     private boolean isFrozen = false;
 
-    // Optional link to GameState for resolving global auras on this card
     private GameState gameStateContext;
 
-    // We maintain a damage counter instead of mutating base health.
-    // Current health = (BaseHealth modified) - damageTaken
     private int damageTaken = 0;
-
-    // Safety flag for destruction logic queueing
     private boolean isMarkedForDestruction = false;
 
-    // Modifier pipelines for dynamic attributes
     private final ModifierPipeline attackPipeline = new ModifierPipeline();
     private final ModifierPipeline healthPipeline = new ModifierPipeline();
     private final ModifierPipeline costPipeline = new ModifierPipeline();
@@ -41,6 +35,12 @@ public class Card {
 
     public void setGameStateContext(GameState state) {
         this.gameStateContext = state;
+
+        // Dynamically wire the Anti-Hero modifier if the trait exists and context is available
+        if (state != null && definition.getTraits() != null && definition.getTraits().containsKey(Trait.ANTI_HERO)) {
+            int antiHeroValue = definition.getTraits().get(Trait.ANTI_HERO);
+            attackPipeline.addModifier(new AntiHeroModifier(instanceId + "_ANTI_HERO", this, state, antiHeroValue));
+        }
     }
 
     public String getInstanceId() { return instanceId; }
@@ -66,10 +66,6 @@ public class Card {
 
         if (finalDamage > 0) {
             this.damageTaken += finalDamage;
-
-            // NOTE: Disptaching DamageTakenEvent should be handled by the combat/event engine in real play,
-            // but we register the state change here.
-
             if (attacker != null && attacker.hasTrait(Trait.DEADLY)) {
                 this.isMarkedForDestruction = true;
             }
@@ -88,10 +84,6 @@ public class Card {
     public boolean isMarkedForDestruction() { return isMarkedForDestruction; }
     public void markForDestruction() { this.isMarkedForDestruction = true; }
 
-    /**
-     * Dynamically determines the active value of a specific trait.
-     * Combines the static blueprint value, dynamic card modifiers, and global auras.
-     */
     public int getTraitValue(Trait trait) {
         int baseValue = 0;
         if (definition.getTraits() != null && definition.getTraits().containsKey(trait)) {

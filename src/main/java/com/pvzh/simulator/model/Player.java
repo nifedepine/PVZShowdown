@@ -38,6 +38,11 @@ public class Player {
     public void spendResources(int amount) { this.currentResources -= amount; }
     public List<Card> getHand() { return hand; }
 
+    public void startTurnRamp() {
+        this.maxResources++;
+        this.currentResources = this.maxResources;
+    }
+
     public boolean addCardToHand(Card card, CardSource source) {
         if (source == CardSource.BOUNCE) {
             hand.add(card);

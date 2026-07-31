@@ -15,6 +15,10 @@ public class Hero {
     private int currentHealth;
     private int blockMeter;
 
+    // Moddable Superblock Limit
+    private int maxBlocks = 3;
+    private int blocksRemaining = 3;
+
     // The pool of superpowers available to be blocked/drawn (usually 4 unique cards)
     private final List<CardDefinition> superpowerPool;
 
@@ -29,25 +33,19 @@ public class Hero {
         this.superpowerPool = new ArrayList<>(superpowerPool);
     }
 
-    public Side getSide() {
-        return side;
-    }
+    public Side getSide() { return side; }
+    public List<HeroClass> getClasses() { return classes; }
+    public int getMaxHealth() { return maxHealth; }
+    public void setMaxHealth(int maxHealth) { this.maxHealth = maxHealth; }
+    public int getCurrentHealth() { return currentHealth; }
+    public int getBlockMeter() { return blockMeter; }
 
-    public List<HeroClass> getClasses() {
-        return classes;
+    public int getMaxBlocks() { return maxBlocks; }
+    public void setMaxBlocks(int maxBlocks) {
+        this.maxBlocks = maxBlocks;
+        this.blocksRemaining = maxBlocks;
     }
-
-    public int getMaxHealth() {
-        return maxHealth;
-    }
-
-    public void setMaxHealth(int maxHealth) {
-        this.maxHealth = maxHealth;
-    }
-
-    public int getCurrentHealth() {
-        return currentHealth;
-    }
+    public int getBlocksRemaining() { return blocksRemaining; }
 
     public void heal(int amount) {
         if (amount > 0) {
@@ -55,14 +53,10 @@ public class Hero {
         }
     }
 
-    public int getBlockMeter() {
-        return blockMeter;
-    }
-
     /**
-     * Applies damage to the hero, processing Block Meter RNG and logic.
+     * Applies damage to the hero, processing Block Meter RNG, block limits, and Superpower rewards.
      * @param amount The amount of incoming damage.
-     * @param attacker The card dealing the damage (determines Bullseye). Nullable (e.g. fatigue or direct effect).
+     * @param attacker The card dealing the damage (determines Bullseye). Nullable.
      * @param blockRewardCallback A callback invoked if the hero successfully blocks.
      */
     public void takeDamage(int amount, Card attacker, Consumer<CardDefinition> blockRewardCallback) {
@@ -70,35 +64,35 @@ public class Hero {
             return;
         }
 
-        // Bullseye bypasses the Block Meter completely.
         boolean hasBullseye = attacker != null && attacker.hasTrait(Trait.BULLSEYE);
 
-        if (hasBullseye) {
+        // Bullseye or 0 blocks remaining -> Damage bypasses block meter completely.
+        if (hasBullseye || blocksRemaining <= 0) {
             this.currentHealth -= amount;
             return;
         }
 
-        // Step 1: Generate RNG for the Block Meter (1, 2, or 3 charges)
-        int charges = random.nextInt(3) + 1; // Generates 1, 2, or 3
+        // Generate RNG for the Block Meter (1, 2, or 3 charges)
+        int charges = random.nextInt(3) + 1;
         this.blockMeter += charges;
 
-        // Step 2: Check for Block
+        // Check for Block
         if (this.blockMeter >= 8) {
             // Damage is immediately cancelled
             this.blockMeter = 0; // Reset meter
+            this.blocksRemaining--; // Decrement available blocks
 
             // Give a random superpower from the pool, if any remain
             if (!superpowerPool.isEmpty()) {
                 int powerIndex = random.nextInt(superpowerPool.size());
                 CardDefinition powerReward = superpowerPool.remove(powerIndex);
 
-                // Use the callback to let the Player class attempt to add it to the hand
                 if (blockRewardCallback != null) {
                     blockRewardCallback.accept(powerReward);
                 }
             }
         } else {
-            // Step 3: If no Block occurred, apply the damage
+            // If no Block occurred, apply the damage
             this.currentHealth -= amount;
         }
     }
