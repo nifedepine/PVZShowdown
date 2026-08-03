@@ -36,7 +36,6 @@ public class Card {
     public void setGameStateContext(GameState state) {
         this.gameStateContext = state;
 
-        // Dynamically wire the Anti-Hero modifier if the trait exists and context is available
         if (state != null && definition.getTraits() != null && definition.getTraits().containsKey(Trait.ANTI_HERO)) {
             int antiHeroValue = definition.getTraits().get(Trait.ANTI_HERO);
             attackPipeline.addModifier(new AntiHeroModifier(instanceId + "_ANTI_HERO", this, state, antiHeroValue));
@@ -55,6 +54,10 @@ public class Card {
     public int getAttack() { return Math.max(0, attackPipeline.compute(definition.getBaseAttack())); }
     public int getMaxHealth() { return Math.max(1, healthPipeline.compute(definition.getBaseHealth())); }
     public int getCurrentHealth() { return Math.max(0, getMaxHealth() - damageTaken); }
+
+    public void resetDamageTaken() {
+        this.damageTaken = 0;
+    }
 
     public void takeDamage(int amount, Card attacker) {
         if (amount <= 0 || isMarkedForDestruction) return;

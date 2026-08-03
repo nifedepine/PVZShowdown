@@ -2,7 +2,9 @@ package com.pvzh.simulator.engine;
 
 import com.pvzh.simulator.model.CardDefinition;
 import com.pvzh.simulator.model.CardType;
+import com.pvzh.simulator.model.HeroClass;
 import com.pvzh.simulator.model.Side;
+import com.pvzh.simulator.model.Tribe;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +22,35 @@ public class CardRegistry {
     }
 
     /**
-     * Gets a random card definition matching the given criteria.
-     * Often used for mechanics like Leap or Conjure.
+     * Gets a completely random card from a provided list using Weighted Selection.
+     * Essential for the Conjure mechanic.
+     */
+    public CardDefinition getRandomCard(List<CardDefinition> pool) {
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+
+        int totalWeight = 0;
+        for (CardDefinition def : pool) {
+            totalWeight += def.getRngWeight();
+        }
+
+        int randomValue = random.nextInt(totalWeight);
+        int currentWeight = 0;
+
+        for (CardDefinition def : pool) {
+            currentWeight += def.getRngWeight();
+            if (randomValue < currentWeight) {
+                return def;
+            }
+        }
+
+        return pool.get(pool.size() - 1); // Fallback
+    }
+
+    /**
+     * Gets a random card definition matching the exact cost.
+     * Often used for mechanics like Leap or Transformation.
      */
     public CardDefinition getRandomCardWithCost(Side side, CardType type, int targetCost) {
         List<CardDefinition> candidates = new ArrayList<>();
@@ -30,11 +59,22 @@ public class CardRegistry {
                 candidates.add(def);
             }
         }
+        return getRandomCard(candidates);
+    }
 
-        if (candidates.isEmpty()) {
-            return null; // Safe failure
+    /**
+     * Flexible Conjure filter. Pass null to ignore a filter parameter.
+     */
+    public List<CardDefinition> getFilteredCards(Side side, CardType type, HeroClass heroClass, Tribe tribe) {
+        List<CardDefinition> candidates = new ArrayList<>();
+        for (CardDefinition def : allCards) {
+            if (side != null && def.getSide() != side) continue;
+            if (type != null && def.getType() != type) continue;
+            if (heroClass != null && def.getHeroClass() != heroClass) continue;
+            if (tribe != null && (def.getTribes() == null || !def.getTribes().contains(tribe))) continue;
+
+            candidates.add(def);
         }
-
-        return candidates.get(random.nextInt(candidates.size()));
+        return candidates;
     }
 }

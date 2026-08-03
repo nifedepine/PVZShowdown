@@ -50,4 +50,6 @@ public class AntiHeroModifier implements Modifier {
     public String getSourceId() {
         return sourceId;
     }
+
+    // AntiHero is inherently tied to the board placement, so it's temporary
 }

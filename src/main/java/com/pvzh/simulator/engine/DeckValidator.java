@@ -12,15 +12,33 @@ import java.util.Map;
  */
 public class DeckValidator {
 
+    private boolean isStrictValidationEnabled = true;
+
+    public DeckValidator(boolean isStrictValidationEnabled) {
+        this.isStrictValidationEnabled = isStrictValidationEnabled;
+    }
+
+    public boolean isStrictValidationEnabled() {
+        return isStrictValidationEnabled;
+    }
+
+    public void setStrictValidationEnabled(boolean strictValidationEnabled) {
+        isStrictValidationEnabled = strictValidationEnabled;
+    }
+
     /**
      * Validates the provided deck for the given hero.
-     * Throws a DeckValidationException if any rule is violated.
+     * Throws a DeckValidationException if any rule is violated and strict mode is enabled.
      *
      * @param deck The deck to validate.
      * @param hero The hero who owns the deck.
      * @throws DeckValidationException if validation fails.
      */
-    public static void validate(Deck deck, Hero hero) throws DeckValidationException {
+    public void validate(Deck deck, Hero hero) throws DeckValidationException {
+        if (!isStrictValidationEnabled) {
+            return; // Sandbox mode bypasses all rules
+        }
+
         // Rule 1: Size Rule
         if (deck.size() != 40) {
             throw new DeckValidationException("Deck must contain exactly 40 cards. Found: " + deck.size());

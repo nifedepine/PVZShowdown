@@ -27,6 +27,10 @@ public class CardDefinition {
     private Map<Trait, Integer> traits;
     private List<String> abilities; // IDs referencing ability logic scripts
 
+    // Moddable weighted RNG for "Conjure" selection.
+    // Defaults to 100 for perfectly uniform vanilla probability.
+    private int rngWeight = 100;
+
     public CardDefinition() {
     }
 
@@ -57,4 +61,7 @@ public class CardDefinition {
     public int getBaseHealth() { return baseHealth; }
     public Map<Trait, Integer> getTraits() { return traits; }
     public List<String> getAbilities() { return abilities; }
+
+    public int getRngWeight() { return rngWeight; }
+    public void setRngWeight(int rngWeight) { this.rngWeight = rngWeight; }
 }
